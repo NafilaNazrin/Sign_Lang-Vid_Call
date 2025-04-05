@@ -35,7 +35,7 @@ class SignLangTransformer(VideoTransformerBase):
         self.current_word = ""
         self.last_added_char = None
         self.last_char_time = 0
-        # Instantiate the MediaPipe Hands and drawing utils once
+        # Instantiate MediaPipe Hands once in the constructor
         self.hands = mp.solutions.hands.Hands(
             static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
         )
@@ -71,10 +71,15 @@ class SignLangTransformer(VideoTransformerBase):
                         data_aux.append(0)
                     prediction = model.predict([np.asarray(data_aux)])
                     try:
+                        # Try to convert prediction to int
                         predicted_index = int(prediction[0])
                         predicted_character = labels_dict.get(predicted_index, '?')
                     except Exception:
-                        predicted_character = '?'
+                        # Fallback: if prediction[0] is directly a label, use it
+                        if prediction[0] in labels_dict.values():
+                            predicted_character = prediction[0]
+                        else:
+                            predicted_character = '?'
                     self.buffer.append(predicted_character)
                     if len(self.buffer) >= 8 and self.buffer.count(self.buffer[-1]) >= 8:
                         stable_char = self.buffer[-1]
@@ -99,7 +104,7 @@ class SignLangTransformer(VideoTransformerBase):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         return img
 
-# Initialize the transformer instance and store it in session_state
+# Initialize transformer_instance in session state if not already set
 if "transformer_instance" not in st.session_state:
     st.session_state["transformer_instance"] = SignLangTransformer()
 

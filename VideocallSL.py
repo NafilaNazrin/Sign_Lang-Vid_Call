@@ -101,8 +101,14 @@ class SignLangTransformer(VideoTransformerBase):
         return img
 
 # Store instance outside to access sentence later
-if 'transformer_instance' not in st.session_state:
-    st.session_state.transformer_instance = SignLangTransformer()
+if "transformer_instance" not in st.session_state:
+    st.session_state["transformer_instance"] = SignLangTransformer()
+
+webrtc_streamer(
+    key="signlang",
+    video_processor_factory=lambda: st.session_state["transformer_instance"]
+)
+
 
 webrtc_streamer(
     key="signlang",

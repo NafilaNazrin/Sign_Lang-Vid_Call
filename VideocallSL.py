@@ -10,6 +10,7 @@ import time
 st.set_page_config(layout="wide")
 st.title("Sign Language Video Call - Real-Time")
 
+# Load the model
 try:
     model_dict = pickle.load(open('model.p', 'rb'))
     model = model_dict['model']
@@ -18,12 +19,14 @@ except Exception as e:
     st.error(f"❌ Failed to load model: {e}")
     st.stop()
 
+# Define label mapping
 labels_dict = {
     0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'del', 5: 'E', 6: 'F', 7: 'G', 8: 'H', 9: 'I',
     10: 'J', 11: 'K', 12: 'L', 13: 'M', 14: 'N', 15: 'O', 16: 'P', 17: 'Q', 18: 'R', 19: 'S',
     20: 'space', 21: 'T', 22: 'U', 23: 'V', 24: 'W', 25: 'X', 26: 'Y', 27: 'Z'
 }
 
+# Define the transformer class
 class SignLangTransformer(VideoTransformerBase):
     def __init__(self):
         self.buffer = deque(maxlen=10)
@@ -33,6 +36,7 @@ class SignLangTransformer(VideoTransformerBase):
         self.last_char_time = 0
 
     def transform(self, frame):
+        # Instantiate MediaPipe Hands for this frame
         hands = mp.solutions.hands.Hands(
             static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5)
         mp_drawing = mp.solutions.drawing_utils
@@ -100,22 +104,26 @@ class SignLangTransformer(VideoTransformerBase):
 
         return img
 
-# Store instance outside to access sentence later
+# Initialize transformer instance in session state if not present
 if "transformer_instance" not in st.session_state:
     st.session_state["transformer_instance"] = SignLangTransformer()
 
+# Use a unique key for the webrtc_streamer
 webrtc_streamer(
-    key="signlang",
+    key="signlang_video",
     video_processor_factory=lambda: st.session_state["transformer_instance"]
 )
 
-
-webrtc_streamer(
-    key="signlang",
-    video_processor_factory=lambda: st.session_state.transformer_instance
-)
-
 st.subheader("Translated Text")
-if st.session_state.get('transformer_instance'):
-    trans = st.session_state.transformer_instance
+if "transformer_instance" in st.session_state:
+    trans = st.session_state["transformer_instance"]
     st.text_area("Output", value=trans.sentence + " " + trans.current_word, height=100)
+
+# Optional: Test model prediction with random data
+if st.button("🔍 Test Model Prediction with Random Data"):
+    fake_input = np.random.rand(42).tolist()
+    try:
+        prediction = model.predict([fake_input])
+        st.success(f"✅ Model Prediction Successful: {prediction[0]}")
+    except Exception as e:
+        st.error(f"❌ Model Prediction Failed: {e}")

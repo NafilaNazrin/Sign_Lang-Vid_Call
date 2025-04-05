@@ -3,14 +3,21 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from collections import deque
-import time
 import streamlit as st
+from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
+import av
+import time
 
-model_dict = pickle.load(open('./model.p', 'rb'))
+st.set_page_config(layout="wide")
+st.title("Sign Language Video Call - Real-Time")
+
+
+model_dict = pickle.load(open('model.p', 'rb'))
 model = model_dict['model']
 
+
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(static_image_mode=True, min_detection_confidence=0.3)
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5)
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 
@@ -20,9 +27,7 @@ labels_dict = {
     20: 'space', 21: 'T', 22: 'U', 23: 'V', 24: 'W', 25: 'X', 26: 'Y', 27: 'Z'
 }
 
-st.set_page_config(layout="wide")
-st.title("Sign Language Video Call")
-
+# Session states
 if 'sentence' not in st.session_state:
     st.session_state.sentence = ""
 if 'current_word' not in st.session_state:
@@ -33,15 +38,14 @@ if 'last_added_char' not in st.session_state:
     st.session_state.last_added_char = None
 if 'last_char_time' not in st.session_state:
     st.session_state.last_char_time = 0
-if 'frame_window' not in st.session_state:
-    st.session_state.frame_window = st.empty()
 
-def process_frame(frame):
-    try:
-        img = frame.copy()
-        data_aux = []
-        x_ = []
-        y_ = []
+
+class SignLangTransformer(VideoTransformerBase):
+    def transform(self, frame):
+        image = frame.to_ndarray(format="bgr24")
+        img = image.copy()
+
+        x_, y_, data_aux = [], [], []
 
         frame_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = hands.process(frame_rgb)
@@ -74,14 +78,12 @@ def process_frame(frame):
                         data_aux.append(0)
 
                     prediction = model.predict([np.asarray(data_aux)])
-                    
-                    print("Raw prediction:", prediction)
                     try:
                         predicted_index = int(prediction[0])
                         predicted_character = labels_dict.get(predicted_index, '?')
                     except (ValueError, IndexError):
-                        predicted_character = str(prediction[0]) if prediction[0] in labels_dict.values() else '?'
-                    
+                        predicted_character = '?'
+
                     st.session_state.buffer.append(predicted_character)
 
                     if len(st.session_state.buffer) >= 8 and \
@@ -104,46 +106,14 @@ def process_frame(frame):
                                 st.session_state.last_added_char = stable_char
                                 st.session_state.last_char_time = current_time
 
-        cv2.putText(img, f"Sentence: {st.session_state.sentence}", (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(img, f"Current: {st.session_state.current_word}", (10, 60), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        
+        cv2.putText(img, f"Sentence: {st.session_state.sentence}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        cv2.putText(img, f"Current: {st.session_state.current_word}", (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
         return img
-    
-    except Exception as e:
-        print(f"Error in process_frame: {e}")
-        return frame
 
-col1, col2 = st.columns(2)
-
-with col1:
-    
-    run = st.checkbox('Start Camera')
-    
-    if run:
-        cap = cv2.VideoCapture(0)
-        while run:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to access camera")
-                break
-            
-            try:
-                processed_frame = process_frame(frame)
-                st.session_state.frame_window.image(processed_frame, channels="BGR")
-            except Exception as e:
-                st.error(f"Error processing frame: {e}")
-                break
-            
-            # To prevent freezing
-            time.sleep(0.05)
-            
-            if not run:
-                break
-                
-        cap.release()
-
+webrtc_streamer(key="signlang", video_processor_factory=SignLangTransformer)
 
 st.subheader("Translated Text")
 st.text_area("Output", 

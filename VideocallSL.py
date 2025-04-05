@@ -7,6 +7,7 @@ import streamlit as st
 from streamlit_webrtc import VideoTransformerBase, webrtc_streamer
 import time
 
+# Set up the page
 st.set_page_config(layout="wide")
 st.title("Sign Language Video Call - Real-Time")
 
@@ -26,7 +27,7 @@ labels_dict = {
     20: 'space', 21: 'T', 22: 'U', 23: 'V', 24: 'W', 25: 'X', 26: 'Y', 27: 'Z'
 }
 
-# Define the transformer class
+# Define the transformer class for video processing
 class SignLangTransformer(VideoTransformerBase):
     def __init__(self):
         self.buffer = deque(maxlen=10)
@@ -38,7 +39,8 @@ class SignLangTransformer(VideoTransformerBase):
     def transform(self, frame):
         # Instantiate MediaPipe Hands for this frame
         hands = mp.solutions.hands.Hands(
-            static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5)
+            static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
+        )
         mp_drawing = mp.solutions.drawing_utils
         mp_drawing_styles = mp.solutions.drawing_styles
 
@@ -52,9 +54,12 @@ class SignLangTransformer(VideoTransformerBase):
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
                 mp_drawing.draw_landmarks(
-                    img, hand_landmarks, mp.solutions.hands.HAND_CONNECTIONS,
+                    img,
+                    hand_landmarks,
+                    mp.solutions.hands.HAND_CONNECTIONS,
                     mp_drawing_styles.get_default_hand_landmarks_style(),
-                    mp_drawing_styles.get_default_hand_connections_style())
+                    mp_drawing_styles.get_default_hand_connections_style()
+                )
 
                 for lm in hand_landmarks.landmark:
                     x_.append(lm.x)
@@ -104,20 +109,19 @@ class SignLangTransformer(VideoTransformerBase):
 
         return img
 
-# Initialize transformer instance in session state if not present
-if "transformer_instance" not in st.session_state:
-    st.session_state["transformer_instance"] = SignLangTransformer()
+# Initialize transformer_instance in session state if not already set
+st.session_state.setdefault("transformer_instance", SignLangTransformer())
 
-# Use a unique key for the webrtc_streamer
+# Use a unique key for webrtc_streamer
 webrtc_streamer(
     key="signlang_video",
     video_processor_factory=lambda: st.session_state["transformer_instance"]
 )
 
 st.subheader("Translated Text")
-if "transformer_instance" in st.session_state:
-    trans = st.session_state["transformer_instance"]
-    st.text_area("Output", value=trans.sentence + " " + trans.current_word, height=100)
+transformer = st.session_state.get("transformer_instance")
+if transformer is not None:
+    st.text_area("Output", value=transformer.sentence + " " + transformer.current_word, height=100)
 
 # Optional: Test model prediction with random data
 if st.button("🔍 Test Model Prediction with Random Data"):

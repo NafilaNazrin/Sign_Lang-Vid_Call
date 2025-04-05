@@ -11,10 +11,17 @@ import time
 st.set_page_config(layout="wide")
 st.title("Sign Language Video Call - Real-Time")
 
+# 🧪 DEBUG: Model loading
+try:
+    model_dict = pickle.load(open('model.p', 'rb'))
+    model = model_dict['model']
+    st.success("✅ Model loaded successfully.")
+except Exception as e:
+    st.error(f"❌ Failed to load model: {e}")
+    st.stop()
 
-model_dict = pickle.load(open('model.p', 'rb'))
-model = model_dict['model']
-
+# 🧪 DEBUG: Before initializing WebRTC
+st.info("🔄 Initializing WebRTC Streamer...")
 
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5)
@@ -112,6 +119,7 @@ class SignLangTransformer(VideoTransformerBase):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
         return img
+
 
 webrtc_streamer(key="signlang", video_processor_factory=SignLangTransformer)
 

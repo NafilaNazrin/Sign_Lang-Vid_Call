@@ -128,3 +128,12 @@ st.text_area("Output",
              value=st.session_state.sentence + " " + st.session_state.current_word, 
              height=100, 
              key="output_text")
+
+
+if st.button("🔍 Test Model Prediction with Random Data"):
+    fake_input = np.random.rand(42).tolist()
+    try:
+        prediction = model.predict([fake_input])
+        st.success(f"✅ Model Prediction Successful: {prediction[0]}")
+    except Exception as e:
+        st.error(f"❌ Model Prediction Failed: {e}")

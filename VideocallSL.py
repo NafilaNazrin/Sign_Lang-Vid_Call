@@ -60,26 +60,33 @@ class SignLangTransformer(VideoTransformerBase):
                     mp_drawing_styles.get_default_hand_landmarks_style(),
                     mp_drawing_styles.get_default_hand_connections_style()
                 )
+
                 for lm in hand_landmarks.landmark:
                     x_.append(lm.x)
                     y_.append(lm.y)
+
                 if x_ and y_:
                     for lm in hand_landmarks.landmark:
                         data_aux.append(lm.x - min(x_))
                         data_aux.append(lm.y - min(y_))
+
                     data_aux = data_aux[:42]
                     while len(data_aux) < 42:
                         data_aux.append(0)
+
                     prediction = model.predict([np.asarray(data_aux)])
                     try:
                         predicted_index = int(prediction[0])
                         predicted_character = labels_dict.get(predicted_index, '?')
                     except Exception:
                         predicted_character = '?'
+
                     self.buffer.append(predicted_character)
+
                     if len(self.buffer) >= 8 and self.buffer.count(self.buffer[-1]) >= 8:
                         stable_char = self.buffer[-1]
                         current_time = time.time()
+
                         if stable_char == "space":
                             if self.current_word:
                                 self.sentence += self.current_word + " "
@@ -89,7 +96,8 @@ class SignLangTransformer(VideoTransformerBase):
                             self.current_word = self.current_word[:-1]
                             self.last_added_char = None
                         else:
-                            if stable_char != self.last_added_char or (current_time - self.last_char_time > 0.8):
+                            if stable_char != self.last_added_char or \
+                               (current_time - self.last_char_time > 0.8):
                                 self.current_word += stable_char
                                 self.last_added_char = stable_char
                                 self.last_char_time = current_time
@@ -98,25 +106,24 @@ class SignLangTransformer(VideoTransformerBase):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         cv2.putText(img, f"Current: {self.current_word}", (10, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
         return img
 
 # Initialize transformer_instance in session state if not already set
-if "transformer_instance" not in st.session_state:
-    st.session_state["transformer_instance"] = SignLangTransformer()
+st.session_state.setdefault("transformer_instance", SignLangTransformer())
 
-# Retrieve the transformer instance to use in our webrtc_streamer
-transformer_instance = st.session_state["transformer_instance"]
-
-# Start the webrtc_streamer with a unique key
+# Use a unique key for webrtc_streamer
 webrtc_streamer(
     key="signlang_video",
-    video_processor_factory=lambda: transformer_instance
+    video_processor_factory=lambda: st.session_state["transformer_instance"]
 )
 
 st.subheader("Translated Text")
-st.text_area("Output", value=transformer_instance.sentence + " " + transformer_instance.current_word, height=100)
+transformer = st.session_state.get("transformer_instance")
+if transformer is not None:
+    st.text_area("Output", value=transformer.sentence + " " + transformer.current_word, height=100)
 
-# Optional: Button to test model prediction with random data
+# Optional: Test model prediction with random data
 if st.button("🔍 Test Model Prediction with Random Data"):
     fake_input = np.random.rand(42).tolist()
     try:

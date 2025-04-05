@@ -35,30 +35,29 @@ class SignLangTransformer(VideoTransformerBase):
         self.current_word = ""
         self.last_added_char = None
         self.last_char_time = 0
-
-    def transform(self, frame):
-        # Instantiate MediaPipe Hands for this frame
-        hands = mp.solutions.hands.Hands(
+        # Instantiate the MediaPipe Hands and drawing utils once
+        self.hands = mp.solutions.hands.Hands(
             static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5
         )
-        mp_drawing = mp.solutions.drawing_utils
-        mp_drawing_styles = mp.solutions.drawing_styles
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.mp_drawing_styles = mp.solutions.drawing_styles
 
+    def transform(self, frame):
         image = frame.to_ndarray(format="bgr24")
         img = image.copy()
 
         data_aux, x_, y_ = [], [], []
         frame_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = hands.process(frame_rgb)
+        results = self.hands.process(frame_rgb)
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                mp_drawing.draw_landmarks(
+                self.mp_drawing.draw_landmarks(
                     img,
                     hand_landmarks,
                     mp.solutions.hands.HAND_CONNECTIONS,
-                    mp_drawing_styles.get_default_hand_landmarks_style(),
-                    mp_drawing_styles.get_default_hand_connections_style()
+                    self.mp_drawing_styles.get_default_hand_landmarks_style(),
+                    self.mp_drawing_styles.get_default_hand_connections_style()
                 )
                 for lm in hand_landmarks.landmark:
                     x_.append(lm.x)
@@ -100,11 +99,10 @@ class SignLangTransformer(VideoTransformerBase):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         return img
 
-# Initialize transformer_instance in session state if not already set
+# Initialize the transformer instance and store it in session_state
 if "transformer_instance" not in st.session_state:
     st.session_state["transformer_instance"] = SignLangTransformer()
 
-# Retrieve the transformer instance to use in our webrtc_streamer
 transformer_instance = st.session_state["transformer_instance"]
 
 # Start the webrtc_streamer with a unique key
